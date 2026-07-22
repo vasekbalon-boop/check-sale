@@ -25,13 +25,13 @@ Víkend proběhne. Sleva skončí. Hra není koupená.
 
 ## 🤖 Řešení
 
-Robot, který každých šest hodin zkontroluje cenu na Steamu, a jakmile spadne pod tvůj práh, napíše ti na Discord. S pingem. Veřejně. A počítá si, pokolikáté už to dělá — protože číslo `3` v embedu bolí víc než jakákoli výčitka.
+Robot, který dvakrát denně zkontroluje cenu na Steamu, a jakmile spadne pod tvůj práh, napíše ti na Discord. S pingem. Veřejně. A počítá si, pokolikáté už to dělá — protože číslo `3` v embedu bolí víc než jakákoli výčitka.
 
 Neběží na žádném serveru. Neplatíš za něj ani korunu. Je to cron v GitHub Actions a webhook. Nic víc.
 
 ```mermaid
 flowchart LR
-    A["⏰ GitHub Actions<br/>1x denně 19:30"] --> B["🐍 check_sale.py"]
+    A["⏰ GitHub Actions<br/>2× denně, ráno a večer"] --> B["🐍 check_sale.py"]
     B --> C{"Sleva ≥ práh<br/>a hlubší než minule?"}
     C -->|ne| D["🤷 mlčí<br/>a jde spát"]
     C -->|ano| E["📨 Discord webhook"]
@@ -102,6 +102,7 @@ Vše se ladí v `env:` bloku ve `.github/workflows/sale-watch.yml`:
 | `STEAM_CC` | `cz` | Region pro ceny |
 | `MIN_DISCOUNT` | `20` | Od kolika procent má vůbec otravovat |
 | `FORCE_NOTIFY` | `false` | Pošli to bez ohledu na slevu (jen testy) |
+| `RESET_COUNTER` | `false` | Vynuluj počítadlo připomínek (po koupi hry) |
 
 > [!TIP]
 > Larian slevuje zřídka a mělce. S prahem `20` se můžeš načekat opravdu dlouho — `10` je realističtější.
@@ -112,6 +113,9 @@ Vše se ladí v `env:` bloku ve `.github/workflows/sale-watch.yml`:
 > | Cron | Léto (SELČ) | Zima (SEČ) | Proč |
 > |---|---|---|---|
 > | `30 18 * * *` | 20:30 | 19:30 | Steam spouští slevy kolem 19:00 |
+> | `30 8 * * *` | 10:30 | 9:30 | Záloha pro případ, že GitHub večerní běh vynechá |
+>
+> Plánovač GitHubu se běžně opozdí o 10–30 minut a pod zátěží běh někdy zahodí úplně. Proto dva časy denně.
 
 
 ## 🎪 Kde bydlí vtipy
