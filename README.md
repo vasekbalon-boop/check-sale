@@ -1,1 +1,2 @@
-# check-sale
+# Dědův BG3 Slevomat
+
