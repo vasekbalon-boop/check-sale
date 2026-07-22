@@ -3,7 +3,7 @@ name: BG3 sale watch
 
 on:
   schedule:
-    - cron: "17 */6 * * *"   # every 6 hours, offset off the hour (less queue contention)
+    - - cron: "17 7 * * *"    # 09:17 CEST / 08:17 CET
   workflow_dispatch:          # lets you trigger a test run from the Actions tab
     inputs:
       force:
