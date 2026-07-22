@@ -1,6 +1,6 @@
 """
-Serverless variant of the BG3 sale watcher — runs once and exits.
-Designed for GitHub Actions cron (or any cron: systemd timer, NAS task scheduler).
+BG3 sale watcher — runs once and exits. Designed for GitHub Actions cron.
+Now with escalating public shaming.
 
 No dependencies: standard library only.
 
@@ -11,10 +11,12 @@ Environment variables:
     STEAM_CC              default "cz"
     MIN_DISCOUNT          default 20
     STATE_FILE            default state.json
+    FORCE_NOTIFY          "1"/"true" -> send regardless of discount (test runs)
 """
 
 import json
 import os
+import random
 import sys
 import urllib.error
 import urllib.request
@@ -31,7 +33,72 @@ FORCE = os.getenv("FORCE_NOTIFY", "").strip().lower() in ("1", "true", "yes")
 
 UA = {"User-Agent": "bg3-sale-watcher/1.0"}
 
+# --------------------------------------------------------------------------- #
+# The important part
+# --------------------------------------------------------------------------- #
+HOOKS = [
+    "🚨 **TOHLE NENÍ CVIČNÝ POPLACH**",
+    "🎲 Hoď si na záchranu proti prokrastinaci. Postihem je tvoje historie.",
+    "📢 Slyšíš to? To je zvuk tvé peněženky, jak se pokouší utéct.",
+    "⚔️ Iniciativa hozena. Jsi na řadě. Zase.",
+    "🔔 Připomínka, kterou si sám nastavil a stejně ji ignoruješ.",
+]
 
+# Indexed by how many times we've already been through this.
+SHAME = {
+    1: [
+        "Sleva je tady. Ty jsi tady. Co by se mohlo pokazit?",
+        "První připomínka. Ještě máš čistý štít.",
+    ],
+    2: [
+        "Podruhé. Minule jsi to taky viděl a pak jsi šel spát.",
+        "Druhá připomínka. Statisticky vzato už to nekoupíš.",
+    ],
+    3: [
+        "Potřetí. **POTŘETÍ.** Hodil sis přirozenou 1 už třikrát za sebou.",
+        "Třetí pokus. I ten nejtrpělivější vypravěč by už protočil oči.",
+    ],
+}
+SHAME_MANY = [
+    "{n}. připomínka. V tomhle tempu to koupíš, až vyjde pokračování.",
+    "Tohle je {n}. kolo. Bot má lepší docházku než ty.",
+    "{n}× jsem tě upozornil. Začínám to brát osobně.",
+    "Připomínka číslo {n}. Archeologové to jednou najdou a budou se divit.",
+]
+
+DEEP_CUT = [
+    "A tohle je fakt hluboká sleva. Žádná další nepřijde.",
+    "Levněji už to nebude. Vážně.",
+    "Za tuhle cenu je to skoro krádež — a ty pořád váháš.",
+]
+
+
+def flavour(discount: int, count: int) -> str:
+    lines = SHAME.get(count) or [random.choice(SHAME_MANY).format(n=count)]
+    text = random.choice(lines)
+    if discount >= 50:
+        text += "\n\n" + random.choice(DEEP_CUT)
+    return text
+
+
+def colour_for(discount: int) -> int:
+    if discount >= 60:
+        return 0xFFD700  # gold
+    if discount >= 40:
+        return 0xE03131  # red
+    if discount >= 20:
+        return 0xF08C00  # orange
+    return 0x868E96      # grey
+
+
+def bar(discount: int) -> str:
+    filled = round(discount / 10)
+    return "🟥" * filled + "⬛" * (10 - filled)
+
+
+# --------------------------------------------------------------------------- #
+# Steam / Discord plumbing
+# --------------------------------------------------------------------------- #
 def get_json(url: str) -> dict:
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -61,6 +128,67 @@ def post_to_discord(payload: dict) -> None:
             raise RuntimeError(f"Discord webhook returned {resp.status}")
 
 
+def build_payload(name: str, price: dict, discount: int, count: int) -> dict:
+    final = price.get("final_formatted", "?")
+    initial = price.get("initial_formatted") or final
+    currency = price.get("currency", "")
+    saved = (price.get("initial", 0) - price.get("final", 0)) / 100
+    store = f"https://store.steampowered.com/app/{APP_ID}/"
+
+    return {
+        "content": f"<@{USER_ID}>  {random.choice(HOOKS)}",
+        "allowed_mentions": {"users": [USER_ID]},
+        "embeds": [
+            {
+                "author": {"name": "Hlídač slev · hlídá líp než ty"},
+                "title": f"🔥 {name} — SLEVA {discount} %",
+                "url": store,
+                "description": (
+                    f"{bar(discount)}\n\n"
+                    f"# {final}\n"
+                    f"~~{initial}~~\n\n"
+                    f"{flavour(discount, count)}"
+                ),
+                "color": colour_for(discount),
+                "fields": [
+                    {
+                        "name": "💰 Ušetříš",
+                        "value": f"**{saved:,.0f} {currency}**".replace(",", " "),
+                        "inline": True,
+                    },
+                    {
+                        "name": "📉 Sleva",
+                        "value": f"**−{discount} %**",
+                        "inline": True,
+                    },
+                    {
+                        "name": "🤦 Kolikátá připomínka",
+                        "value": f"**{count}.**",
+                        "inline": True,
+                    },
+                    {
+                        "name": "\u200b",
+                        "value": f"### [👉 KOUPIT TEĎ, NE ZÍTRA 👈]({store})",
+                        "inline": False,
+                    },
+                ],
+                # header.jpg always exists. For an even bigger banner try:
+                # .../steam/apps/{APP_ID}/library_hero.jpg
+                "image": {
+                    "url": f"https://cdn.cloudflare.steamstatic.com/"
+                    f"steam/apps/{APP_ID}/header.jpg"
+                },
+                "footer": {
+                    "text": f"Steam · region {COUNTRY.upper()} · "
+                    f"další kontrola za 6 hodin, jestli to zas nekoupíš"
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        ],
+    }
+
+
+# --------------------------------------------------------------------------- #
 def main() -> int:
     try:
         state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
@@ -68,6 +196,7 @@ def main() -> int:
         state = {}
 
     announced = int(state.get("announced_discount", 0))
+    count = int(state.get("reminder_count", 0))
 
     try:
         name, price = steam_lookup()
@@ -83,36 +212,18 @@ def main() -> int:
         return 0
 
     discount = int(price.get("discount_percent", 0))
-    final = price.get("final_formatted", "?")
-    initial = price.get("initial_formatted") or final
     state["last_discount"] = discount
-    print(f"{name}: -{discount}% -> {final} (last announced {announced}%)")
+    print(f"{name}: -{discount}% (last announced {announced}%, reminder #{count})")
 
     if FORCE:
         print("FORCE_NOTIFY set — sending regardless of discount.")
 
     if FORCE or (discount >= MIN_DISCOUNT and discount > announced):
-        post_to_discord(
-            {
-                "content": f"<@{USER_ID}>",
-                "allowed_mentions": {"users": [USER_ID]},
-                "embeds": [
-                    {
-                        "title": f"🔥 {name} — sleva {discount} %",
-                        "url": f"https://store.steampowered.com/app/{APP_ID}/",
-                        "description": f"**{final}**  ~~{initial}~~",
-                        "color": 0xC1440E,
-                        "thumbnail": {
-                            "url": f"https://cdn.cloudflare.steamstatic.com/"
-                            f"steam/apps/{APP_ID}/header.jpg"
-                        },
-                        "footer": {"text": f"Steam · region {COUNTRY.upper()}"},
-                    }
-                ],
-            }
-        )
+        shown = count if FORCE else count + 1
+        post_to_discord(build_payload(name, price, discount, shown))
         if not FORCE:
             state["announced_discount"] = discount
+            state["reminder_count"] = shown
         print("Notification sent.")
     elif discount < MIN_DISCOUNT:
         state["announced_discount"] = 0
