@@ -31,7 +31,7 @@ Neběží na žádném serveru. Neplatíš za něj ani korunu. Je to cron v GitH
 
 ```mermaid
 flowchart LR
-    A["⏰ GitHub Actions<br/>2× denně · 9:17 a 19:30"] --> B["🐍 check_sale.py"]
+    A["⏰ GitHub Actions<br/>1x denně 19:30"] --> B["🐍 check_sale.py"]
     B --> C{"Sleva ≥ práh<br/>a hlubší než minule?"}
     C -->|ne| D["🤷 mlčí<br/>a jde spát"]
     C -->|ano| E["📨 Discord webhook"]
