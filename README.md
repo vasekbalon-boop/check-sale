@@ -1,6 +1,5 @@
 <h1 align="center">🐉 Hlídač slev na Baldur's Gate 3</h1>
 
-
 <p align="center">
   <em>Protože potřetí už to není náhoda, ale povahová vada.</em>
 </p>
@@ -32,7 +31,7 @@ Neběží na žádném serveru. Neplatíš za něj ani korunu. Je to cron v GitH
 
 ```mermaid
 flowchart LR
-    A["⏰ GitHub Actions<br/>každých 6 h"] --> B["🐍 check_sale.py"]
+    A["⏰ GitHub Actions<br/>2× denně · 9:17 a 19:30"] --> B["🐍 check_sale.py"]
     B --> C{"Sleva ≥ práh<br/>a hlubší než minule?"}
     C -->|ne| D["🤷 mlčí<br/>a jde spát"]
     C -->|ano| E["📨 Discord webhook"]
@@ -46,7 +45,7 @@ flowchart LR
 
 | | |
 |---|---|
-| 🕕 | Kontroluje cenu 4× denně, napořád, zadarmo |
+| 🕕 | Kontroluje cenu ráno i večer, napořád, zadarmo |
 | 🎭 | Náhodné hlášky z osmi seznamů — neopakuje se ani po dvaceti slevách |
 | 📈 | **Eskaluje.** První připomínka je milá. Čtvrtá ti počítá aura body do minusu |
 | 🧠 | Pamatuje si, co už oznámil — nespamuje, ozve se jen když sleva klesne hlouběji |
@@ -108,7 +107,12 @@ Vše se ladí v `env:` bloku ve `.github/workflows/sale-watch.yml`:
 > Larian slevuje zřídka a mělce. S prahem `20` se můžeš načekat opravdu dlouho — `10` je realističtější.
 
 > [!NOTE]
-> Cron `17 */6 * * *` je v **UTC**, GitHub jiné pásmo neumí. V létě to vychází na 02:17 / 08:17 / 14:17 / 20:17 našeho času, v zimě o hodinu dřív.
+> Cron je v **UTC**, GitHub jiné pásmo neumí — v zimě ti tedy časy o hodinu poskočí.
+>
+> | Cron | Léto (SELČ) | Zima (SEČ) | Proč |
+> |---|---|---|---|
+> | `30 18 * * *` | 20:30 | 19:30 | Steam spouští slevy kolem 19:00 |
+
 
 ## 🎪 Kde bydlí vtipy
 
@@ -121,7 +125,7 @@ Přidat vlastní = dopsat řádek do seznamu. Logiky se to nedotkne. Bav se.
 <details>
 <summary><b>Proč to neběží jako normální bot 24/7?</b></summary>
 
-Protože dělá čtyři HTTP requesty denně. Držet kvůli tomu naživu proces je jako topit v paneláku krbem.
+Protože dělá **dva HTTP requesty denně**. Držet kvůli tomu naživu proces je jako topit v paneláku krbem.
 
 Navíc v roce 2026 free tiery pro always-on boty prakticky umřely — Fly.io free tier zrušil, Render free služby usínají po 15 minutách a background workery má placené, Railway dává jen kredit. Oracle Always Free funguje, ale sbírá idle instance. Cron v Actions žádný z těchto problémů nemá.
 </details>
@@ -131,13 +135,13 @@ Navíc v roce 2026 free tiery pro always-on boty prakticky umřely — Fly.io fr
 
 Vypnul by. Proto skript při každém běhu zapíše čerstvý `last_check` do `state.json` a workflow ho commitne zpátky. Repozitář je tím pádem pořád "aktivní" a plánovač běží dál.
 
-Cenou jsou čtyři mikro-commity denně v historii. V privátním repu to nikoho netrápí.
+Cenou jsou dva mikro-commity denně v historii. V privátním repu to nikoho netrápí.
 </details>
 
 <details>
 <summary><b>Kolik to žere minut?</b></summary>
 
-Veřejný repo: nic, Actions jsou zdarma neomezeně. Privátní: ~1 minuta za běh, tedy asi 120 z 2000 měsíčních minut zdarma.
+Veřejný repo: nic, Actions jsou zdarma neomezeně. Privátní: ~1 minuta za běh, při dvou denních spuštěních tedy asi **60 z 2000** měsíčních minut zdarma.
 </details>
 
 <details>
@@ -164,7 +168,6 @@ Hlášky ale mluví o tom, že jsi to zapomněl koupit potřetí. Tak si je upra
 - [ ] **Skutečně tu hru koupit** ← jediná položka, na které záleží
 - [ ] Zahrát si ji
 
----
 
 <p align="center">
   <sub>Postaveno proti vlastní vůli · MIT licence · hru jsem pořád nekoupil</sub>
